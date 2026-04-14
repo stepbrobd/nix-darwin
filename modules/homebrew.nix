@@ -142,41 +142,24 @@ let
           activation.
         '';
       };
-      envHints = mkOption {
-        type = types.bool;
-        default = true;
+      extraEnv = mkOption {
+        type = types.attrsOf types.str;
+        default = { };
+        example = {
+          HOMEBREW_NO_ENV_HINTS = "1";
+          HOMEBREW_NO_ANALYTICS = "1";
+        };
         description = ''
-          Whether to enable Homebrew to print environment variable hints (e.g.,
-          "Hide these hints with HOMEBREW_NO_ENV_HINTS") during {command}`nix-darwin` system
-          activation.
-
-          Implementation note: when disabled, this option sets the `HOMEBREW_NO_ENV_HINTS`
-          environment variable when {command}`nix-darwin` invokes {command}`brew bundle [install]`
-          during system activation.
-        '';
-      };
-      analytics = mkOption {
-        type = types.bool;
-        default = true;
-        description = ''
-          Whether to enable Homebrew to print analytics notices and collect anonymous analytics
-          during {command}`nix-darwin` system activation.
-
-          Implementation note: when disabled, this option sets the `HOMEBREW_NO_ANALYTICS`
-          environment variable when {command}`nix-darwin` invokes {command}`brew bundle [install]`
-          during system activation.
-        '';
-      };
-      updateReportNew = mkOption {
-        type = types.bool;
-        default = true;
-        description = ''
-          Whether to enable Homebrew to print lists of new formulae and casks after auto-updating
-          during {command}`nix-darwin` system activation.
-
-          Implementation note: when disabled, this option sets the
-          `HOMEBREW_NO_UPDATE_REPORT_NEW` environment variable when {command}`nix-darwin` invokes
+          Extra environment variables to set when {command}`nix-darwin` invokes
           {command}`brew bundle [install]` during system activation.
+
+          Useful for setting Homebrew's `HOMEBREW_NO_*` variables (e.g.,
+          `HOMEBREW_NO_ENV_HINTS`, `HOMEBREW_NO_ANALYTICS`, `HOMEBREW_NO_UPDATE_REPORT_NEW`)
+          that aren't inherited from the user's shell environment because activation runs
+          under sudo.
+
+          Each entry is prepended to the {command}`brew bundle` invocation in the form
+          `KEY=VALUE`, alongside `HOMEBREW_NO_AUTO_UPDATE=1` when applicable.
         '';
       };
       extraFlags = mkOption {
@@ -195,9 +178,7 @@ let
     config = {
       brewBundleCmd = concatStringsSep " " (
         optional (!config.autoUpdate) "HOMEBREW_NO_AUTO_UPDATE=1"
-        ++ optional (!config.envHints) "HOMEBREW_NO_ENV_HINTS=1"
-        ++ optional (!config.analytics) "HOMEBREW_NO_ANALYTICS=1"
-        ++ optional (!config.updateReportNew) "HOMEBREW_NO_UPDATE_REPORT_NEW=1"
+        ++ mapAttrsToList (k: v: "${k}=${escapeShellArg v}") config.extraEnv
         ++ [ "brew bundle --file='${brewfileFile}'" ]
         ++ optional (!config.upgrade) "--no-upgrade"
         ++ optional (config.cleanup == "uninstall") "--cleanup"
@@ -244,42 +225,6 @@ let
           [](#opt-environment.variables).
         '';
       };
-      envHints = mkOption {
-        type = types.bool;
-        default = true;
-        description = ''
-          Whether to enable Homebrew to print environment variable hints (e.g.,
-          "Hide these hints with HOMEBREW_NO_ENV_HINTS") when you manually invoke Homebrew commands.
-
-          Implementation note: when disabled, this option sets the
-          `HOMEBREW_NO_ENV_HINTS` environment variable, by adding it to
-          [](#opt-environment.variables).
-        '';
-      };
-      analytics = mkOption {
-        type = types.bool;
-        default = true;
-        description = ''
-          Whether to enable Homebrew to print analytics notices and collect anonymous analytics
-          when you manually invoke Homebrew commands.
-
-          Implementation note: when disabled, this option sets the
-          `HOMEBREW_NO_ANALYTICS` environment variable, by adding it to
-          [](#opt-environment.variables).
-        '';
-      };
-      updateReportNew = mkOption {
-        type = types.bool;
-        default = true;
-        description = ''
-          Whether to enable Homebrew to print lists of new formulae and casks after auto-updating
-          when you manually invoke Homebrew commands.
-
-          Implementation note: when disabled, this option sets the
-          `HOMEBREW_NO_UPDATE_REPORT_NEW` environment variable, by adding it to
-          [](#opt-environment.variables).
-        '';
-      };
       # `noLock` was the original option; `lockfiles` replaced it (with inverted semantics).
       # Both are now dead: Homebrew Bundle removed lockfile support in Homebrew 4.4.0
       # (Oct 2024), so the `HOMEBREW_BUNDLE_NO_LOCK` env var and `--no-lock` CLI flag are
@@ -296,9 +241,6 @@ let
       homebrewEnvironmentVariables = {
         HOMEBREW_BUNDLE_FILE = mkIf config.brewfile "${brewfileFile}";
         HOMEBREW_NO_AUTO_UPDATE = mkIf (!config.autoUpdate) "1";
-        HOMEBREW_NO_ENV_HINTS = mkIf (!config.envHints) "1";
-        HOMEBREW_NO_ANALYTICS = mkIf (!config.analytics) "1";
-        HOMEBREW_NO_UPDATE_REPORT_NEW = mkIf (!config.updateReportNew) "1";
       };
     };
   };
