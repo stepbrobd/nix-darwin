@@ -142,6 +142,26 @@ let
           activation.
         '';
       };
+      extraEnv = mkOption {
+        type = types.attrsOf types.str;
+        default = { };
+        example = {
+          HOMEBREW_NO_ENV_HINTS = "1";
+          HOMEBREW_NO_ANALYTICS = "1";
+        };
+        description = ''
+          Extra environment variables to set when {command}`nix-darwin` invokes
+          {command}`brew bundle [install]` during system activation.
+
+          Useful for setting Homebrew's `HOMEBREW_NO_*` variables (e.g.,
+          `HOMEBREW_NO_ENV_HINTS`, `HOMEBREW_NO_ANALYTICS`, `HOMEBREW_NO_UPDATE_REPORT_NEW`)
+          that aren't inherited from the user's shell environment because activation runs
+          under sudo.
+
+          Each entry is prepended to the {command}`brew bundle` invocation in the form
+          `KEY=VALUE`, alongside `HOMEBREW_NO_AUTO_UPDATE=1` when applicable.
+        '';
+      };
       extraFlags = mkOption {
         type = types.listOf types.str;
         default = [ ];
@@ -158,6 +178,7 @@ let
     config = {
       brewBundleCmd = concatStringsSep " " (
         optional (!config.autoUpdate) "HOMEBREW_NO_AUTO_UPDATE=1"
+        ++ mapAttrsToList (k: v: "${k}=${escapeShellArg v}") config.extraEnv
         ++ [ "brew bundle --file='${brewfileFile}'" ]
         ++ optional (!config.upgrade) "--no-upgrade"
         ++ optional (config.cleanup == "uninstall") "--cleanup"
